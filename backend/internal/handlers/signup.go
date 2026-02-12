@@ -19,31 +19,45 @@ func addCorsHeaders(w http.ResponseWriter, r *http.Request) {
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
-	addCorsHeaders(w, r)
+	w.Header().Set("Content-Type", "application/json")
 
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodOptions {
+		// Let CORS middleware handle preflight properly
 		return
 	}
 
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not Allowed", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Method not allowed",
+		})
 		return
 	}
 
-	var req SignupRequest
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid body", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Invalid request body",
+		})
 		return
 	}
 
 	err := db.CreateUser(req.Email, req.Password)
 	if err != nil {
-		http.Error(w, "User already exists or db error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": err.Error(),
+		})
 		return
 	}
 
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "User created successfully",
+		"message": "Signup successful",
 	})
 }

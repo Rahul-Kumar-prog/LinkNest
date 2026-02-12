@@ -29,6 +29,10 @@ func GetUserByEmail(email string) (*User, error) {
 }
 
 func CreateUser(email, password string) error {
+	if DB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword(
 		[]byte(password),
 		bcrypt.DefaultCost,
@@ -36,11 +40,27 @@ func CreateUser(email, password string) error {
 	if err != nil {
 		return err
 	}
-	_, err = DB.Exec(
+
+	result, err := DB.Exec(
 		`INSERT INTO app.users (email, password)
 		 VALUES ($1, $2)`,
 		email,
 		string(hashedPassword),
 	)
-	return err
+
+	// 🔴 THIS CHECK WAS MISSING
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 1 {
+		fmt.Println("✅ User created successfully:", email)
+	}
+
+	return nil
 }
