@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Loginpage() {
     const [email, setEmail] = useState<string>('');
     const [password, setPassword] = useState<string>('');
+    const navigate = useNavigate();
 
     const handleLogin = async () => {
         try {
@@ -16,11 +18,12 @@ export default function Loginpage() {
             });
             const data = await response.json();
             if (!response.ok) {
-                alert(data.message || 'Signup failed');
+                alert(data.message || 'Login failed');
                 return;
             }
-            // localStorage.setItem("token", data.token)
+            localStorage.setItem("token", data.token);
             alert(data.message);
+            navigate('/');
         } catch (error) {
             console.error('Error:', error);
             alert('Failed to connect to backend from the frontend on login');

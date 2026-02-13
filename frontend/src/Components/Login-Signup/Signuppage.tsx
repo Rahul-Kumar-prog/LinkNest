@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Signuppage() {
     const [email, setEmail] = useState<string>('');
     const [password, setPassword] = useState<string>('');
+    const navigate = useNavigate();
 
     const handleSignup = async () => {
         try {
@@ -19,6 +21,7 @@ export default function Signuppage() {
                 return;
             }
             alert(data.message);
+            navigate('/');
         } catch (error) {
             console.error('Error:', error);
             alert('Failed to connect to backend from the frontend on signup');

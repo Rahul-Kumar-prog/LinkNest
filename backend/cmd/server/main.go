@@ -40,6 +40,7 @@ func main() {
 
 	mux.HandleFunc("/api/login", handlers.LoginHandler)
 	mux.HandleFunc("/api/signup", handlers.SignupHandler)
+	mux.HandleFunc("/api/twitter", handlers.TwitterHandler)
 
 	corsHandler := corsMiddleware(mux)
 
