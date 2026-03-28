@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/Rahul-Kumar-prog/linknest/internal/db"
-	utils "github.com/Rahul-Kumar-prog/linknest/utils/jwt"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -16,72 +15,63 @@ type LoginRequest struct {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if r.Method == "OPTIONS" {
+	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Method not allowed",
-		})
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid body",
-		})
+		writeError(w, http.StatusBadRequest, "Invalid body")
 		return
 	}
 
 	user, err := db.GetUserByEmail(req.Email)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid credentials",
-		})
+		writeError(w, http.StatusUnauthorized, "Invalid credentials")
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword(
-		[]byte(user.Password),
-		[]byte(req.Password),
-	); err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid credentials",
-		})
+	if user.Password == "" {
+		writeError(w, http.StatusUnauthorized, "Use Google sign in for this account")
 		return
 	}
-	token, err := utils.GenerateJwtToken(user.ID, user.Email)
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		writeError(w, http.StatusUnauthorized, "Invalid credentials")
+		return
+	}
+
+	token, err := issueAuthSession(w, user)
 	if err != nil {
 		log.Print("failed to generate jwt token: ", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Failed to generate token",
-		})
+		writeError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     "auth_token",
-		Value:    token,
-		HttpOnly: true,
-		Secure:   false,
-		Path:     "/",
-		MaxAge:   60 * 60 * 24,
-		SameSite: http.SameSiteLaxMode,
-	})
-	json.NewEncoder(w).Encode(map[string]interface{}{
+
+	writeJSON(w, http.StatusOK, map[string]any{
 		"message": "Login successful",
 		"token":   token,
 		"user": map[string]string{
 			"id":    user.ID,
 			"email": user.Email,
 		},
+	})
+}
+
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	clearAuthSession(w)
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Logout successful",
 	})
 }
