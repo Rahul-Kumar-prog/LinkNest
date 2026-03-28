@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/Rahul-Kumar-prog/linknest/internal/db"
@@ -14,57 +15,63 @@ type LoginRequest struct {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	addCorsHeaders(w, r)
-
-	if r.Method == "OPTIONS" {
+	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Method not allowed",
-		})
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid body",
-		})
+		writeError(w, http.StatusBadRequest, "Invalid body")
 		return
 	}
 
 	user, err := db.GetUserByEmail(req.Email)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid credentials",
-		})
+		writeError(w, http.StatusUnauthorized, "Invalid credentials")
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword(
-		[]byte(user.Password),
-		[]byte(req.Password),
-	); err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid credentials",
-		})
+	if user.Password == "" {
+		writeError(w, http.StatusUnauthorized, "Use Google sign in for this account")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		writeError(w, http.StatusUnauthorized, "Invalid credentials")
+		return
+	}
+
+	token, err := issueAuthSession(w, user)
+	if err != nil {
+		log.Print("failed to generate jwt token: ", err)
+		writeError(w, http.StatusInternalServerError, "Failed to generate token")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
 		"message": "Login successful",
+		"token":   token,
 		"user": map[string]string{
 			"id":    user.ID,
 			"email": user.Email,
 		},
+	})
+}
+
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	clearAuthSession(w)
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Logout successful",
 	})
 }
