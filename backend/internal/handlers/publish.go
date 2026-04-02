@@ -14,9 +14,11 @@ import (
 const xPostLimit = 280
 
 type publishRequest struct {
-	Content   string
-	Platforms []string
-	Media     *publishMedia
+	Content         string
+	ContentX        string
+	ContentLinkedIn string
+	Platforms       []string
+	Media           *publishMedia
 }
 
 type publishMedia struct {
@@ -98,7 +100,9 @@ func PublishPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.Content = strings.TrimSpace(req.Content)
-	if req.Content == "" {
+	req.ContentX = strings.TrimSpace(firstNonEmpty(req.ContentX, req.Content))
+	req.ContentLinkedIn = strings.TrimSpace(firstNonEmpty(req.ContentLinkedIn, req.Content))
+	if req.Content == "" && req.ContentX == "" && req.ContentLinkedIn == "" {
 		writeError(w, http.StatusBadRequest, "Post content is required")
 		return
 	}
@@ -112,11 +116,11 @@ func PublishPostHandler(w http.ResponseWriter, r *http.Request) {
 	for _, platform := range req.Platforms {
 		switch platform {
 		case "x":
-			if len([]rune(req.Content)) > xPostLimit {
+			if len([]rune(req.ContentX)) > xPostLimit {
 				results = append(results, publishResult{Platform: platform, Success: false, Error: "Content exceeds X post limit"})
 				continue
 			}
-			fallbackURL := buildXIntentURL(req.Content)
+			fallbackURL := buildXIntentURL(req.ContentX)
 			results = append(results, publishResult{
 				Platform:    platform,
 				Success:     true,
@@ -129,7 +133,7 @@ func PublishPostHandler(w http.ResponseWriter, r *http.Request) {
 				results = append(results, publishResult{Platform: platform, Success: false, Error: "LinkedIn account is not connected"})
 				continue
 			}
-			err = publishToLinkedIn(user.LinkedInAccessToken, user.LinkedInUserID, req.Content, req.Media)
+			err = publishToLinkedIn(user.LinkedInAccessToken, user.LinkedInUserID, req.ContentLinkedIn, req.Media)
 		default:
 			err = fmt.Errorf("unsupported platform: %s", platform)
 		}
@@ -167,8 +171,10 @@ func parsePublishRequest(r *http.Request) (*publishRequest, error) {
 		}
 
 		req := &publishRequest{
-			Content:   r.FormValue("content"),
-			Platforms: parsePlatformsField(r.FormValue("platforms")),
+			Content:         r.FormValue("content"),
+			ContentX:        r.FormValue("content_x"),
+			ContentLinkedIn: r.FormValue("content_linkedin"),
+			Platforms:       parsePlatformsField(r.FormValue("platforms")),
 		}
 
 		file, header, err := r.FormFile("media")
@@ -198,16 +204,20 @@ func parsePublishRequest(r *http.Request) (*publishRequest, error) {
 	}
 
 	var body struct {
-		Content   string   `json:"content"`
-		Platforms []string `json:"platforms"`
+		Content         string   `json:"content"`
+		ContentX        string   `json:"content_x"`
+		ContentLinkedIn string   `json:"content_linkedin"`
+		Platforms       []string `json:"platforms"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		return nil, fmt.Errorf("invalid request body")
 	}
 
 	return &publishRequest{
-		Content:   body.Content,
-		Platforms: body.Platforms,
+		Content:         body.Content,
+		ContentX:        body.ContentX,
+		ContentLinkedIn: body.ContentLinkedIn,
+		Platforms:       body.Platforms,
 	}, nil
 }
 

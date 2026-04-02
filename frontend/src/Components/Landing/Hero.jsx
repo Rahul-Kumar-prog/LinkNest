@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import knativeLinkedinAvatar from "../../assets/mentions/knative-linkedin.svg";
+import klouseLinkedinAvatar from "../../assets/mentions/klouse-linkedin.svg";
 
 const platformMeta = {
     x: {
@@ -9,6 +11,47 @@ const platformMeta = {
         badge: "in",
     },
 };
+
+const localMentionSuggestions = [
+    { handle: "KnativeProject", name: "KnativeProject", meta: "@KnativeProject", avatar: "https://unavatar.io/twitter/KnativeProject", platform: "x" },
+    { handle: "Knative", name: "Knative", meta: "Company · IT Services and IT Consulting", avatar: knativeLinkedinAvatar, platform: "linkedin" },
+    { handle: "KnativeTips", name: "knative.tips", meta: "@KnativeTips", avatar: "https://unavatar.io/twitter/KnativeTips", platform: "x" },
+    { handle: "KNative22", name: "KHALANGA NATIVE", meta: "@KNative22", avatar: "https://unavatar.io/twitter/KNative22", platform: "x" },
+    { handle: "KlouseKnative", name: "Klouse Knative", meta: "3rd+ · I'm Serverless | Cloud Connoisseur", avatar: klouseLinkedinAvatar, platform: "linkedin" },
+    { handle: "knativejewel", name: "Just me", meta: "@knativejewel", avatar: "https://unavatar.io/twitter/knativejewel", platform: "x" },
+    { handle: "kobepickup18", name: "k native", meta: "@kobepickup18", avatar: "https://unavatar.io/twitter/kobepickup18", platform: "x" },
+    { handle: "openai", name: "OpenAI", meta: "@OpenAI", avatar: "https://unavatar.io/twitter/OpenAI", platform: "x" },
+    { handle: "OpenAI", name: "OpenAI", meta: "Research organization · AI", avatar: "https://ui-avatars.com/api/?name=OpenAI&background=111827&color=ffffff&bold=true", platform: "linkedin" },
+    { handle: "vercel", name: "Vercel", meta: "@vercel", avatar: "https://unavatar.io/twitter/vercel", platform: "x" },
+    { handle: "github", name: "GitHub", meta: "@github", avatar: "https://unavatar.io/github/github", platform: "x" },
+    { handle: "rauchg", name: "Guillermo Rauch", meta: "@rauchg", avatar: "https://unavatar.io/twitter/rauchg", platform: "x" },
+    { handle: "t3dotgg", name: "Theo", meta: "@t3dotgg", avatar: "https://unavatar.io/twitter/t3dotgg", platform: "x" }
+];
+
+const mentionPlatformMap = new Map(
+    localMentionSuggestions.map((item) => [item.handle.toLowerCase(), item.platform])
+);
+
+function buildPlatformSpecificText(text, platform) {
+    return text
+        .split("\n")
+        .map((line) => line
+            .replace(/@[A-Za-z0-9_.]+/g, (mention) => {
+                const handle = mention.slice(1).toLowerCase();
+                const mentionPlatform = mentionPlatformMap.get(handle);
+                if (mentionPlatform && mentionPlatform !== platform) {
+                    return "";
+                }
+                return mention;
+            })
+            .replace(/ {2,}/g, " ")
+            .replace(/\s+([,.!?;:])/g, "$1")
+            .trimEnd()
+        )
+        .join("\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
 
 function MediaIcon() {
     return (
@@ -130,20 +173,57 @@ function PreviewAvatar({ image, fallback, className = "h-12 w-12" }) {
     );
 }
 
+function HighlightMentions({ text, mentionClassName, textClassName }) {
+    const segments = [];
+    const regex = /(@[A-Za-z0-9_.]+)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+            segments.push({ type: "text", value: text.slice(lastIndex, match.index) });
+        }
+        segments.push({ type: "mention", value: match[0] });
+        lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < text.length) {
+        segments.push({ type: "text", value: text.slice(lastIndex) });
+    }
+
+    if (!segments.length) {
+        segments.push({ type: "text", value: text });
+    }
+
+    return (
+        <>
+            {segments.map((segment, index) => (
+                <span
+                    key={`${segment.type}-${index}`}
+                    className={segment.type === "mention" ? mentionClassName : textClassName}
+                >
+                    {segment.value}
+                </span>
+            ))}
+        </>
+    );
+}
+
 function LinkedInPreview({ draft, attachedMedia, user }) {
     const [expanded, setExpanded] = useState(false);
     const linkedInLimit = 280;
-    const hasDraft = Boolean(draft);
-    const isTruncated = hasDraft && draft.length > linkedInLimit;
-    const previewText = hasDraft
-        ? (expanded ? draft : draft.slice(0, linkedInLimit))
+    const linkedInDraft = buildPlatformSpecificText(draft, "linkedin");
+    const hasDraft = Boolean(linkedInDraft);
+    const isTruncated = hasDraft && linkedInDraft.length > linkedInLimit;
+    const previewText = linkedInDraft
+        ? (expanded ? linkedInDraft : linkedInDraft.slice(0, linkedInLimit))
         : "Your LinkedIn post preview will appear here.";
 
     useEffect(() => {
         if (!isTruncated) {
             setExpanded(false);
         }
-    }, [isTruncated, draft]);
+    }, [isTruncated, linkedInDraft]);
 
     return (
         <section className="min-w-0 rounded-[2rem] border border-white/10 bg-slate-900/80 p-6">
@@ -165,7 +245,7 @@ function LinkedInPreview({ draft, attachedMedia, user }) {
                 </div>
                 <div className="mt-4">
                     <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-base leading-7 text-slate-900">
-                        {previewText}
+                        <HighlightMentions text={previewText} mentionClassName="text-sky-500" textClassName="text-slate-900" />
                     </p>
                     {isTruncated ? (
                         <div className="mt-1 text-right">
@@ -213,18 +293,195 @@ function LinkedInPreview({ draft, attachedMedia, user }) {
 
 
 function HighlightedComposer({ draft, setDraft }) {
+    const textareaRef = useRef(null);
+    const mirrorRef = useRef(null);
+    const [mentionQuery, setMentionQuery] = useState("");
+    const [mentionRange, setMentionRange] = useState(null);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [failedAvatars, setFailedAvatars] = useState({});
+
+    const filteredSuggestions = useMemo(() => {
+        if (!mentionQuery) {
+            return [];
+        }
+
+        const query = mentionQuery.toLowerCase();
+        return localMentionSuggestions
+            .filter((item) => item.handle.toLowerCase().includes(query) || item.name.toLowerCase().includes(query) || item.meta.toLowerCase().includes(query))
+            .slice(0, 5);
+    }, [mentionQuery]);
+
+    const composerMarkup = useMemo(() => {
+        const segments = [];
+        const regex = /(@[A-Za-z0-9_.]+)/g;
+        let lastIndex = 0;
+        let match;
+
+        while ((match = regex.exec(draft)) !== null) {
+            if (match.index > lastIndex) {
+                segments.push({ type: "text", value: draft.slice(lastIndex, match.index) });
+            }
+            segments.push({ type: "mention", value: match[0] });
+            lastIndex = match.index + match[0].length;
+        }
+
+        if (lastIndex < draft.length) {
+            segments.push({ type: "text", value: draft.slice(lastIndex) });
+        }
+
+        if (!segments.length) {
+            segments.push({ type: "text", value: "" });
+        }
+
+        return segments;
+    }, [draft]);
+
+    useEffect(() => {
+        setActiveIndex(0);
+    }, [mentionQuery]);
+
+    const updateMentionState = (value, cursorPosition) => {
+        const beforeCursor = value.slice(0, cursorPosition);
+        const match = beforeCursor.match(/(^|\s)@([A-Za-z0-9_.]{1,30})$/);
+        if (!match) {
+            setMentionQuery("");
+            setMentionRange(null);
+            return;
+        }
+
+        const query = match[2] || "";
+        const start = cursorPosition - query.length - 1;
+        setMentionQuery(query);
+        setMentionRange({ start, end: cursorPosition });
+    };
+
+    const applyMention = (suggestion) => {
+        if (!mentionRange || !textareaRef.current) {
+            return;
+        }
+
+        const insertion = `@${suggestion.handle}`;
+        const nextValue = `${draft.slice(0, mentionRange.start)}${insertion} ${draft.slice(mentionRange.end)}`;
+        const nextCursor = mentionRange.start + suggestion.handle.length + 2;
+        setDraft(nextValue);
+        setMentionQuery("");
+        setMentionRange(null);
+
+        requestAnimationFrame(() => {
+            textareaRef.current?.focus();
+            textareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+        });
+    };
+
+    const handleChange = (event) => {
+        const value = event.target.value;
+        const cursorPosition = event.target.selectionStart ?? value.length;
+        setDraft(value);
+        updateMentionState(value, cursorPosition);
+    };
+
+    const handleKeyDown = (event) => {
+        if (!filteredSuggestions.length) {
+            return;
+        }
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setActiveIndex((current) => (current + 1) % filteredSuggestions.length);
+        } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActiveIndex((current) => (current - 1 + filteredSuggestions.length) % filteredSuggestions.length);
+        } else if (event.key === "Enter" || event.key === "Tab") {
+            event.preventDefault();
+            applyMention(filteredSuggestions[activeIndex]);
+        } else if (event.key === "Escape") {
+            setMentionQuery("");
+            setMentionRange(null);
+        }
+    };
+
+    const syncScroll = (event) => {
+        if (!mirrorRef.current) {
+            return;
+        }
+        mirrorRef.current.scrollTop = event.currentTarget.scrollTop;
+        mirrorRef.current.scrollLeft = event.currentTarget.scrollLeft;
+    };
+
     return (
-        <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Share a launch update, a product insight, or your next announcement."
-            className="h-80 w-full rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-6 text-lg text-white outline-none transition placeholder:text-stone-500 focus:border-sky-400/60 break-words"
-        />
+        <div className="relative">
+            <div
+                ref={mirrorRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 overflow-hidden rounded-[1.5rem] border border-transparent p-6 text-lg leading-normal whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
+            >
+                {draft ? (
+                    composerMarkup.map((segment, index) => (
+                        <span key={`${segment.type}-${index}`} className={segment.type === "mention" ? "text-sky-400" : "text-white"}>
+                            {segment.value}
+                        </span>
+                    ))
+                ) : (
+                    <span className="text-stone-500">Share a launch update, a product insight, or your next announcement.</span>
+                )}
+                <span className="invisible">{"\n"}</span>
+            </div>
+            <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+                onScroll={syncScroll}
+                onClick={(event) => updateMentionState(event.target.value, event.target.selectionStart ?? event.target.value.length)}
+                onKeyUp={(event) => updateMentionState(event.currentTarget.value, event.currentTarget.selectionStart ?? event.currentTarget.value.length)}
+                placeholder=""
+                spellCheck={false}
+                className="relative z-10 h-80 w-full rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-6 text-lg text-transparent caret-white outline-none transition focus:border-sky-400/60"
+            />
+            {filteredSuggestions.length ? (
+                <div className="absolute left-6 top-24 z-20 w-[26rem] max-w-[calc(100%-3rem)] overflow-hidden rounded-[1.4rem] border border-white/10 bg-[#0f1117] shadow-2xl shadow-black/70">
+                    {filteredSuggestions.map((suggestion, index) => (
+                        <button
+                            key={suggestion.handle}
+                            type="button"
+                            onMouseDown={(event) => {
+                                event.preventDefault();
+                                applyMention(suggestion);
+                            }}
+                            className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${index === activeIndex ? "bg-white/10" : "hover:bg-white/5"}`}
+                        >
+                            {suggestion.avatar && !failedAvatars[suggestion.handle] ? (
+                                <img
+                                    src={suggestion.avatar}
+                                    alt={suggestion.name}
+                                    className="h-12 w-12 rounded-full object-cover"
+                                    onError={() => setFailedAvatars((current) => ({ ...current, [suggestion.handle]: true }))}
+                                />
+                            ) : (
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-500/20 text-sm font-bold text-sky-200">
+                                    @{suggestion.handle.slice(0, 1).toUpperCase()}
+                                </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                    <p className="truncate text-base font-semibold text-white">{suggestion.name}</p>
+                                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${suggestion.platform === "linkedin" ? "bg-[#0A66C2] text-white" : "bg-white text-slate-950"}`}>
+                                        {suggestion.platform === "linkedin" ? "in" : <XLogo className="h-2.5 w-2.5" />}
+                                    </span>
+                                </div>
+                                <p className="truncate text-sm text-stone-400">{suggestion.meta}</p>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            ) : null}
+        </div>
     );
 }
 
 function XPreview({ draft, attachedMedia, user, username, xLimit }) {
-    const previewText = draft ? draft.slice(0, xLimit) : "Your X post preview will appear here.";
+    const xDraft = buildPlatformSpecificText(draft, "x");
+    const previewText = xDraft ? xDraft.slice(0, xLimit) : "Your X post preview will appear here.";
 
     return (
         <section className="min-w-0 rounded-[2rem] border border-white/10 bg-slate-900/80 p-6">
@@ -246,7 +503,7 @@ function XPreview({ draft, attachedMedia, user, username, xLimit }) {
                     </div>
                 </div>
                 <p className="mt-4 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-base leading-7 text-slate-900">
-                    {previewText}
+                    <HighlightMentions text={previewText} mentionClassName="text-sky-500" textClassName="text-slate-900" />
                 </p>
                 {attachedMedia ? (
                     <img

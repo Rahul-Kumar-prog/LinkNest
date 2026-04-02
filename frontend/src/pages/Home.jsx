@@ -8,6 +8,42 @@ const platformRoutes = {
     linkedin: "linkedin",
 };
 
+const platformMentionMap = new Map([
+    ["knativeproject", "x"],
+    ["knative", "linkedin"],
+    ["knativetips", "x"],
+    ["knative22", "x"],
+    ["klouseknative", "linkedin"],
+    ["knativejewel", "x"],
+    ["kobepickup18", "x"],
+    ["openai", "linkedin"],
+    ["vercel", "x"],
+    ["github", "x"],
+    ["rauchg", "x"],
+    ["t3dotgg", "x"],
+]);
+
+function buildPlatformSpecificText(text, platform) {
+    return text
+        .split("\n")
+        .map((line) => line
+            .replace(/@[A-Za-z0-9_.]+/g, (mention) => {
+                const handle = mention.slice(1).toLowerCase();
+                const mentionPlatform = platformMentionMap.get(handle);
+                if (mentionPlatform && mentionPlatform !== platform) {
+                    return "";
+                }
+                return mention;
+            })
+            .replace(/ {2,}/g, " ")
+            .replace(/\s+([,.!?;:])/g, "$1")
+            .trimEnd()
+        )
+        .join("\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
+
 export default function Home() {
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -192,6 +228,9 @@ export default function Home() {
                 formData.append("platforms", JSON.stringify(selectedPlatforms));
                 formData.append("media", attachedMedia);
 
+                formData.set("content", buildPlatformSpecificText(draft, "linkedin"));
+                formData.append("content_x", buildPlatformSpecificText(draft, "x"));
+                formData.append("content_linkedin", buildPlatformSpecificText(draft, "linkedin"));
                 response = await fetch(`${API_BASE}/api/posts/publish`, {
                     method: "POST",
                     credentials: "include",
@@ -205,7 +244,9 @@ export default function Home() {
                     },
                     credentials: "include",
                     body: JSON.stringify({
-                        content: draft,
+                        content: buildPlatformSpecificText(draft, "linkedin"),
+                        content_x: buildPlatformSpecificText(draft, "x"),
+                        content_linkedin: buildPlatformSpecificText(draft, "linkedin"),
                         platforms: selectedPlatforms,
                     }),
                 });
