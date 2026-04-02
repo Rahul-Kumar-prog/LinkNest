@@ -287,7 +287,9 @@ export default function Hero({
     user,
 }) {
     const [pickerOpen, setPickerOpen] = useState(false);
+    const [publishMenuOpen, setPublishMenuOpen] = useState(false);
     const pickerRef = useRef(null);
+    const publishMenuRef = useRef(null);
     const xCount = draft.length;
     const xTooLong = xCount > xLimit;
     const mediaPreviewUrl = useMemo(() => {
@@ -310,6 +312,9 @@ export default function Hero({
         const handleClickOutside = (event) => {
             if (pickerRef.current && !pickerRef.current.contains(event.target)) {
                 setPickerOpen(false);
+            }
+            if (publishMenuRef.current && !publishMenuRef.current.contains(event.target)) {
+                setPublishMenuOpen(false);
             }
         };
 
@@ -378,16 +383,6 @@ export default function Hero({
                                         </div>
                                     ) : null}
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setDraft("");
-                                        onRemoveMedia();
-                                    }}
-                                    className="rounded-full border border-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-stone-300 transition hover:bg-white/5"
-                                >
-                                    Clear
-                                </button>
                             </div>
                         </div>
                         <HighlightedComposer
@@ -409,14 +404,41 @@ export default function Hero({
                                     {attachedMedia ? attachedMedia.name : "Attach one image"}
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={onPublish}
-                                disabled={publishing}
-                                className="rounded-full bg-sky-400 px-8 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:bg-sky-400/60"
-                            >
-                                {publishing ? "Publishing..." : "Publish now"}
-                            </button>
+                            <div className="relative" ref={publishMenuRef}>
+                                <div className="flex overflow-hidden rounded-full bg-sky-400 text-slate-950 transition hover:bg-sky-300">
+                                    <button
+                                        type="button"
+                                        onClick={onPublish}
+                                        disabled={publishing}
+                                        className="px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:bg-sky-400/60"
+                                    >
+                                        {publishing ? "Publishing..." : "Publish now"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPublishMenuOpen((current) => !current)}
+                                        className="border-l border-slate-950/10 px-3 py-3 text-slate-950 transition hover:bg-sky-300/80"
+                                        aria-label="Open publish actions"
+                                    >
+                                        <ChevronIcon open={publishMenuOpen} />
+                                    </button>
+                                </div>
+                                {publishMenuOpen ? (
+                                    <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 min-w-32 rounded-2xl border border-white/10 bg-slate-950/95 p-2 shadow-2xl shadow-black/50 backdrop-blur">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setDraft("");
+                                                onRemoveMedia();
+                                                setPublishMenuOpen(false);
+                                            }}
+                                            className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-stone-200 transition hover:bg-white/10"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </div>
                         </div>
                         {attachedMedia ? (
                             <div className="mt-5 rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
