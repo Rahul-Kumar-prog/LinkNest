@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -25,9 +26,11 @@ type publishMedia struct {
 }
 
 type publishResult struct {
-	Platform string `json:"platform"`
-	Success  bool   `json:"success"`
-	Error    string `json:"error,omitempty"`
+	Platform    string `json:"platform"`
+	Success     bool   `json:"success"`
+	Error       string `json:"error,omitempty"`
+	Message     string `json:"message,omitempty"`
+	FallbackURL string `json:"fallback_url,omitempty"`
 }
 
 type xCreatePostRequest struct {
@@ -113,11 +116,14 @@ func PublishPostHandler(w http.ResponseWriter, r *http.Request) {
 				results = append(results, publishResult{Platform: platform, Success: false, Error: "Content exceeds X post limit"})
 				continue
 			}
-			if user.XAccessToken == "" || user.XUserID == "" {
-				results = append(results, publishResult{Platform: platform, Success: false, Error: "X account is not connected"})
-				continue
-			}
-			err = publishToX(user.XAccessToken, req.Content, req.Media)
+			fallbackURL := buildXIntentURL(req.Content)
+			results = append(results, publishResult{
+				Platform:    platform,
+				Success:     true,
+				Message:     "Opened the X composer with your draft.",
+				FallbackURL: fallbackURL,
+			})
+			continue
 		case "linkedin":
 			if user.LinkedInAccessToken == "" || user.LinkedInUserID == "" {
 				results = append(results, publishResult{Platform: platform, Success: false, Error: "LinkedIn account is not connected"})
@@ -203,6 +209,10 @@ func parsePublishRequest(r *http.Request) (*publishRequest, error) {
 		Content:   body.Content,
 		Platforms: body.Platforms,
 	}, nil
+}
+
+func buildXIntentURL(content string) string {
+	return "https://twitter.com/intent/tweet?text=" + url.QueryEscape(content)
 }
 
 func parsePlatformsField(value string) []string {

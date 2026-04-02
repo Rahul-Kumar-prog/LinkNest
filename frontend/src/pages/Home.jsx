@@ -216,10 +216,27 @@ export default function Home() {
                 throw new Error(data.error || "Publishing failed");
             }
 
-            setPublishResults(data.results || []);
-            const successCount = (data.results || []).filter((result) => result.success).length;
+            const results = data.results || [];
+            setPublishResults(results);
+
+            const xFallback = results.find((result) => result.platform === "x" && result.fallback_url);
+            if (xFallback?.fallback_url) {
+                window.open(xFallback.fallback_url, "_blank", "noopener,noreferrer");
+            }
+
+            const successCount = results.filter((result) => result.success).length;
             if (successCount > 0) {
-                setNotice(successCount === selectedPlatforms.length ? "Post published." : "Post published partially.");
+                const linkedInSuccess = results.some((result) => result.platform === "linkedin" && result.success);
+                const xComposerOpened = results.some((result) => result.platform === "x" && result.fallback_url);
+
+                if (linkedInSuccess && xComposerOpened) {
+                    setNotice("LinkedIn was published. X composer opened with the same draft.");
+                } else if (xComposerOpened) {
+                    setNotice("X composer opened with your draft.");
+                } else {
+                    setNotice(successCount === selectedPlatforms.length ? "Post published." : "Post published partially.");
+                }
+
                 if (successCount === selectedPlatforms.length) {
                     setAttachedMedia(null);
                 }
