@@ -8,6 +8,18 @@ const platformRoutes = {
     linkedin: "linkedin",
 };
 
+const openXComposer = (content) => {
+    const url = new URL("https://twitter.com/intent/tweet");
+    url.searchParams.set("text", content);
+
+    const xWindow = window.open(url.toString(), "_blank");
+    if (xWindow) {
+        xWindow.opener = null;
+    }
+
+    return xWindow;
+};
+
 export default function Home() {
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -21,7 +33,6 @@ export default function Home() {
     const [activeChannel, setActiveChannel] = useState("all");
 
     const xLimit = session?.limits?.x_post_length ?? 280;
-    const xTooLong = draft.length > xLimit;
 
     const refreshStatus = async () => {
         try {
@@ -184,43 +195,67 @@ export default function Home() {
 
         setPublishing(true);
         try {
-            let response;
+            const apiPlatforms = selectedPlatforms.filter((platform) => platform !== "x");
+            const results = [];
 
-            if (attachedMedia) {
-                const formData = new FormData();
-                formData.append("content", draft);
-                formData.append("platforms", JSON.stringify(selectedPlatforms));
-                formData.append("media", attachedMedia);
-
-                response = await fetch(`${API_BASE}/api/posts/publish`, {
-                    method: "POST",
-                    credentials: "include",
-                    body: formData,
-                });
-            } else {
-                response = await fetch(`${API_BASE}/api/posts/publish`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    credentials: "include",
-                    body: JSON.stringify({
-                        content: draft,
-                        platforms: selectedPlatforms,
-                    }),
+            if (selectedPlatforms.includes("x")) {
+                const xWindow = openXComposer(draft);
+                results.push({
+                    platform: "x",
+                    success: Boolean(xWindow),
+                    message: attachedMedia
+                        ? "X draft opened with text. Attach the selected image manually in X before posting."
+                        : "X draft opened with text. Press Post in X to finish.",
+                    error: xWindow ? "" : "X draft popup was blocked. Allow popups for this site and try again.",
                 });
             }
 
-            const data = await response.json();
-            if (!response.ok && !data.results) {
-                throw new Error(data.error || "Publishing failed");
+            if (apiPlatforms.length > 0) {
+                let response;
+
+                if (attachedMedia) {
+                    const formData = new FormData();
+                    formData.append("content", draft);
+                    formData.append("platforms", JSON.stringify(apiPlatforms));
+                    formData.append("media", attachedMedia);
+
+                    response = await fetch(`${API_BASE}/api/posts/publish`, {
+                        method: "POST",
+                        credentials: "include",
+                        body: formData,
+                    });
+                } else {
+                    response = await fetch(`${API_BASE}/api/posts/publish`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        credentials: "include",
+                        body: JSON.stringify({
+                            content: draft,
+                            platforms: apiPlatforms,
+                        }),
+                    });
+                }
+
+                const data = await response.json();
+                if (!response.ok && !data.results) {
+                    throw new Error(data.error || "Publishing failed");
+                }
+
+                results.push(...(data.results || []));
             }
 
-            setPublishResults(data.results || []);
-            const successCount = (data.results || []).filter((result) => result.success).length;
+            setPublishResults(results);
+            const successCount = results.filter((result) => result.success).length;
+            const allSucceeded = successCount === results.length;
+
             if (successCount > 0) {
-                setNotice(successCount === selectedPlatforms.length ? "Post published." : "Post published partially.");
-                if (successCount === selectedPlatforms.length) {
+                const xMediaNote = selectedPlatforms.includes("x") && attachedMedia
+                    ? " X cannot auto-fill local media from a browser, so attach the image manually in the X tab."
+                    : "";
+                setNotice(`${allSucceeded ? "Publish flow started." : "Publish flow partially completed."}${xMediaNote}`);
+                if (apiPlatforms.length > 0 && apiPlatforms.length === successCount && !selectedPlatforms.includes("x")) {
                     setAttachedMedia(null);
                 }
             } else {

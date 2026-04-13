@@ -135,15 +135,10 @@ function LinkedInPreview({ draft, attachedMedia, user }) {
     const linkedInLimit = 280;
     const hasDraft = Boolean(draft);
     const isTruncated = hasDraft && draft.length > linkedInLimit;
+    const showExpanded = expanded && isTruncated;
     const previewText = hasDraft
-        ? (expanded ? draft : draft.slice(0, linkedInLimit))
+        ? (showExpanded ? draft : draft.slice(0, linkedInLimit))
         : "Your LinkedIn post preview will appear here.";
-
-    useEffect(() => {
-        if (!isTruncated) {
-            setExpanded(false);
-        }
-    }, [isTruncated, draft]);
 
     return (
         <section className="min-w-0 rounded-[2rem] border border-white/10 bg-slate-900/80 p-6">
@@ -174,7 +169,7 @@ function LinkedInPreview({ draft, attachedMedia, user }) {
                                 onClick={() => setExpanded((current) => !current)}
                                 className="cursor-pointer text-sm font-medium text-slate-500 transition hover:text-slate-700"
                             >
-                                {expanded ? "show less" : "...more"}
+                                {showExpanded ? "show less" : "...more"}
                             </button>
                         </div>
                     ) : null}
@@ -489,7 +484,7 @@ export default function Hero({
                                             }`}
                                         >
                                             <span className="font-semibold">{platformMeta[result.platform]?.label || result.platform}:</span>{" "}
-                                            {result.success ? "Published successfully." : result.error}
+                                            {result.success ? (result.message || "Published successfully.") : result.error}
                                         </div>
                                     ))}
                                 </div>

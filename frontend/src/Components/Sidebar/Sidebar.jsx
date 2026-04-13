@@ -29,7 +29,7 @@ const ChannelAvatar = ({ type, imageUrl, accent, badge }) => {
                     className="h-12 w-12 rounded-full object-cover ring-1 ring-white/10"
                 />
                 {badge ? (
-                    <span className={["absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-stone-950 text-[10px] font-bold text-white", badge].join(" ")}>
+                    <span className={["absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-stone-950 text-[10px] font-bold", badge].join(" ")}>
                         {type === "linkedin" ? "in" : <XLogo className="h-2.5 w-2.5" />}
                     </span>
                 ) : null}
@@ -39,11 +39,11 @@ const ChannelAvatar = ({ type, imageUrl, accent, badge }) => {
 
     return (
         <div className="relative h-12 w-12 shrink-0">
-            <div className={["flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold text-white", accent].join(" ")}>
+            <div className={["flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold", accent].join(" ")}>
                 {type === "linkedin" ? "in" : <XLogo className="h-2.5 w-2.5" />}
             </div>
             {badge ? (
-                <span className={["absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-stone-950 text-[10px] font-bold text-white", badge].join(" ")}>
+                <span className={["absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-stone-950 text-[10px] font-bold", badge].join(" ")}>
                     {type === "linkedin" ? "in" : <XLogo className="h-2.5 w-2.5" />}
                 </span>
             ) : null}
@@ -52,12 +52,12 @@ const ChannelAvatar = ({ type, imageUrl, accent, badge }) => {
 };
 
 const channels = [
-    { id: "all", name: "All Channels", accent: "bg-stone-700" },
-    { id: "linkedin", name: "LinkedIn", accent: "bg-blue-700", badge: "bg-blue-600" },
+    { id: "all", name: "All Channels", accent: "bg-stone-700 text-white" },
+    { id: "linkedin", name: "LinkedIn", accent: "bg-blue-700 text-white", badge: "bg-blue-600 text-white" },
     { id: "x", name: "X", accent: "bg-white text-slate-950", badge: "bg-white text-slate-950" },
 ];
 
-export default function Sidebar({ user, platforms, activeChannel, onOpenChannel, onLogout }) {
+export default function Sidebar({ user, platforms, activeChannel, busyPlatform, onConnect, onOpenChannel, onLogout }) {
     return (
         <aside className="border-b border-white/10 bg-slate-950/95 px-6 py-6 lg:fixed lg:left-0 lg:top-0 lg:h-screen lg:w-80 lg:border-b-0 lg:border-r">
             <div className="flex h-full flex-col">
@@ -109,32 +109,45 @@ export default function Sidebar({ user, platforms, activeChannel, onOpenChannel,
                                     ? (connection?.name || connection?.username || connection?.user_id || channel.name)
                                     : (connection?.name || channel.name);
                             const rowClass = activeChannel === channel.id
-                                ? "w-full rounded-[0.9rem] bg-indigo-900/80 px-3 py-3 text-left transition hover:bg-indigo-800/80"
-                                : "w-full rounded-[0.9rem] bg-transparent px-3 py-3 text-left transition hover:bg-white/[0.04]";
+                                ? "flex w-full items-center gap-3 rounded-[0.9rem] bg-indigo-900/80 px-3 py-3 transition hover:bg-indigo-800/80"
+                                : "flex w-full items-center gap-3 rounded-[0.9rem] bg-transparent px-3 py-3 transition hover:bg-white/[0.04]";
+                            const isBusy = busyPlatform === channel.id;
 
                             return (
-                                <button
-                                    key={channel.id}
-                                    type="button"
-                                    onClick={() => onOpenChannel(channel.id)}
-                                    className={rowClass}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <ChannelAvatar
-                                            type={channel.id}
-                                            imageUrl={connection?.profile_picture}
-                                            accent={channel.accent}
-                                            badge={channel.badge}
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-semibold text-white">{label}</p>
-                                            {channel.id !== "all" && !connected ? (
-                                                <p className="truncate text-xs text-stone-500">Not connected</p>
-                                            ) : null}
+                                <div key={channel.id} className={rowClass}>
+                                    <button
+                                        type="button"
+                                        onClick={() => onOpenChannel(channel.id)}
+                                        className="min-w-0 flex-1 text-left"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <ChannelAvatar
+                                                type={channel.id}
+                                                imageUrl={connection?.profile_picture}
+                                                accent={channel.accent}
+                                                badge={channel.badge}
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-semibold text-white">{label}</p>
+                                                {channel.id !== "all" && !connected ? (
+                                                    <p className="truncate text-xs text-stone-500">Not connected</p>
+                                                ) : null}
+                                            </div>
                                         </div>
-                                        <span className="text-sm font-semibold text-stone-200">0</span>
-                                    </div>
-                                </button>
+                                    </button>
+                                    {channel.id !== "all" && !connected ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => onConnect(channel.id)}
+                                            disabled={isBusy}
+                                            className="shrink-0 rounded-full bg-sky-400 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-sky-300 disabled:cursor-wait disabled:opacity-60"
+                                        >
+                                            {isBusy ? "Connecting" : "Connect"}
+                                        </button>
+                                    ) : (
+                                        <span className="shrink-0 text-sm font-semibold text-stone-200">0</span>
+                                    )}
+                                </div>
                             );
                         })}
                     </div>
