@@ -321,7 +321,7 @@ func decodeAPIError(resp *http.Response) error {
 		message = resp.Status
 	}
 
-	return fmt.Errorf(message)
+	return fmt.Errorf("%s", message)
 }
 
 func firstNonEmpty(values ...string) string {
